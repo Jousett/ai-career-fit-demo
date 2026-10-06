@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Career Fit & Resume Focus</title>
+  <style>
+    :root { --bg:#f7f7f8; --card:#fff; --text:#1f2937; --muted:#6b7280; --accent:#111827; --border:#e5e7eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:980px; margin:40px auto; padding:0 20px; }
+    h1 { margin-bottom:8px; }
+    .sub { color:var(--muted); margin-top:0; line-height:1.5; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    label { display:block; font-weight:700; margin-bottom:8px; }
+    textarea, input { width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; font:inherit; }
+    textarea { min-height:220px; resize:vertical; }
+    button { background:var(--accent); color:white; border:0; padding:12px 16px; border-radius:10px; font-weight:700; cursor:pointer; }
+    button:hover { opacity:.92; }
+    .result { margin-top:18px; display:none; }
+    .score { font-size:42px; font-weight:800; margin:8px 0; }
+    .tag { display:inline-block; padding:5px 9px; border:1px solid var(--border); border-radius:999px; margin:4px 4px 0 0; background:#fafafa; }
+    pre { white-space:pre-wrap; background:#f3f4f6; padding:14px; border-radius:10px; overflow:auto; }
+    footer { color:var(--muted); margin:28px 0 10px; font-size:14px; line-height:1.5; }
+    @media (max-width:760px){ .grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Career Fit & Resume Focus</h1>
+  <p class="sub">A lightweight experiment for turning a job description into a structured fit review and a ready-to-use AI prompt for resume tailoring.</p>
+
+  <div class="grid">
+    <div class="card">
+      <label for="jd">Job description</label>
+      <textarea id="jd" placeholder="Paste a job description here..."></textarea>
+    </div>
+    <div class="card">
+      <label for="profile">Your experience / strengths</label>
+      <textarea id="profile" placeholder="Paste a short professional profile, resume summary, or key skills..."></textarea>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px;">
+    <label for="priorities">Your priorities</label>
+    <input id="priorities" value="stable employment, strong benefits, meaningful work, remote flexibility, sustainable workload" />
+    <div style="margin-top:14px;"><button onclick="analyze()">Analyze fit</button></div>
+
+    <div id="result" class="result">
+      <div class="score" id="score"></div>
+      <div id="summary"></div>
+      <h3>Shared keywords</h3>
+      <div id="matches"></div>
+      <h3>Potential gaps to verify</h3>
+      <div id="gaps"></div>
+      <h3>AI prompt for deeper analysis</h3>
+      <pre id="prompt"></pre>
+    </div>
+  </div>
+
+  <footer>
+    Built as a learning project to explore how AI can support—not replace—human judgment in career decisions.
+    The browser performs a simple keyword comparison locally; the generated prompt can then be used with an AI assistant for a deeper, human-reviewed analysis.
+  </footer>
+</div>
+
+<script>
+const stop = new Set(("the a an and or of to in for with on at by from as is are was were be been being this that these those " +
+"you your our we they their it its will can may should must have has had do does did not but if then than into across " +
+"about role position work working team teams job candidate candidates experience years").split(/\s+/));
+
+function words(t){
+  return [...new Set((t.toLowerCase().match(/[a-z][a-z0-9+#.-]{2,}/g)||[])
+    .filter(w=>!stop.has(w)))];
+}
+function topWords(text, n=40){
+  const arr=(text.toLowerCase().match(/[a-z][a-z0-9+#.-]{2,}/g)||[]).filter(w=>!stop.has(w));
+  const c={}; arr.forEach(w=>c[w]=(c[w]||0)+1);
+  return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
+}
+function analyze(){
+  const jd=document.getElementById('jd').value.trim();
+  const profile=document.getElementById('profile').value.trim();
+  const priorities=document.getElementById('priorities').value.trim();
+  if(!jd || !profile){ alert("Please paste both a job description and your experience/strengths."); return; }
+
+  const j=topWords(jd,50), p=new Set(words(profile));
+  const matches=j.filter(w=>p.has(w)).slice(0,18);
+  const gaps=j.filter(w=>!p.has(w)).slice(0,12);
+  const score=Math.max(0, Math.min(100, Math.round((matches.length / Math.max(12, Math.min(j.length,24))) * 100)));
+
+  document.getElementById('score').textContent = score + "% keyword overlap";
+  document.getElementById('summary').innerHTML =
+    "<p><strong>Use this as a screening signal, not a hiring prediction.</strong> Review the gaps and decide which are true requirements versus terminology differences.</p>";
+  document.getElementById('matches').innerHTML = matches.length ? matches.map(x=>`<span class="tag">${x}</span>`).join("") : "<em>No obvious shared keywords found.</em>";
+  document.getElementById('gaps').innerHTML = gaps.length ? gaps.map(x=>`<span class="tag">${x}</span>`).join("") : "<em>No obvious keyword gaps found.</em>";
+
+  const prompt = `Act as a careful career-fit analyst. Compare the job description and candidate profile below.
+
+Priorities:
+${priorities}
+
+Rules:
+- Do not invent experience.
+- Separate hard requirements from preferred qualifications.
+- Identify transferable experience.
+- Flag anything that must be verified before applying.
+- Recommend APPLY, INVESTIGATE, or PASS and explain why.
+- Suggest 5-8 truthful resume emphasis points.
+
+JOB DESCRIPTION:
+${jd}
+
+CANDIDATE PROFILE:
+${profile}`;
+  document.getElementById('prompt').textContent=prompt;
+  document.getElementById('result').style.display='block';
+}
+</script>
+</body>
+</html>
